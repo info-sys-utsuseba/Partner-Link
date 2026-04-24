@@ -12,6 +12,7 @@ type ChatMessage = {
   content: string;
   references?: KnowledgeReference[];
   showEscalation?: boolean;
+  timestamp: Date;
 };
 
 type ChatApiResponse = {
@@ -42,6 +43,29 @@ function refIcon(kind: KnowledgeReference["kind"]): string {
   }
 }
 
+function formatTime(date: Date): string {
+  return date.toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" });
+}
+
+// LINE風タイピングドット
+function TypingIndicator() {
+  return (
+    <div className="flex items-end gap-2 mb-3">
+      {/* アバター */}
+      <div className="w-9 h-9 rounded-full bg-[#06C755] flex items-center justify-center flex-shrink-0 shadow-sm">
+        <span className="text-white text-sm font-bold">AI</span>
+      </div>
+      <div className="bg-white rounded-2xl rounded-bl-sm px-4 py-3 shadow-sm border border-gray-100">
+        <div className="flex gap-1 items-center h-4">
+          <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+          <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+          <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function ChatView() {
   const searchParams = useSearchParams();
   const menuType = searchParams.get("type");
@@ -61,6 +85,7 @@ export function ChatView() {
   const [inquiryError, setInquiryError] = useState<string | null>(null);
 
   const bottomRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     const key = "partner-link.sessionId";
@@ -78,11 +103,27 @@ export function ChatView() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, pending, inquiryOpenFor]);
 
+  // textareaの高さを自動調整
+  function adjustTextarea() {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = Math.min(el.scrollHeight, 120) + "px";
+  }
+
   async function send(rawQuery: string) {
     const query = rawQuery.trim();
     if (!query || pending) return;
     setInput("");
-    const userMsg: ChatMessage = { id: uuid(), role: "user", content: query };
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+    }
+    const userMsg: ChatMessage = {
+      id: uuid(),
+      role: "user",
+      content: query,
+      timestamp: new Date(),
+    };
     setMessages((m) => [...m, userMsg]);
     setPending(true);
 
@@ -104,6 +145,7 @@ export function ChatView() {
           content,
           references: data.references ?? [],
           showEscalation: Boolean(data.shouldEscalate),
+          timestamp: new Date(),
         },
       ]);
     } catch {
@@ -114,6 +156,7 @@ export function ChatView() {
           role: "assistant",
           content: "通信エラーが発生しました。時間をおいて再度お試しください。",
           showEscalation: true,
+          timestamp: new Date(),
         },
       ]);
     } finally {
@@ -124,7 +167,6 @@ export function ChatView() {
   function openInquiryFor(msg: ChatMessage) {
     setInquiryOpenFor(msg.id);
     setInquiryError(null);
-    // 直近のユーザー質問を初期値に
     const lastUser = [...messages].reverse().find((m) => m.role === "user");
     setInquiryQuestion(lastUser?.content ?? "");
   }
@@ -158,9 +200,8 @@ export function ChatView() {
         {
           id: uuid(),
           role: "system",
-          content:
-            data.message ??
-            "担当者へお繋ぎしました。追ってご連絡いたします。",
+          content: data.message ?? "担当者へお繋ぎしました。追ってご連絡いたします。",
+          timestamp: new Date(),
         },
       ]);
       setInquiryOpenFor(null);
@@ -182,40 +223,56 @@ export function ChatView() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-zinc-50 dark:bg-black">
-      <header className="border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950">
-        <div className="mx-auto max-w-3xl px-4 py-3 flex items-baseline justify-between">
-          <div>
-            <h1 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">
+    <div className="flex flex-col h-screen" style={{ background: "#EBF5FB" }}>
+      {/* ===== ヘッダー（LINE風グリーン） ===== */}
+      <header
+        className="flex-shrink-0 shadow-sm"
+        style={{ background: "#06C755" }}
+      >
+        <div className="mx-auto max-w-2xl px-4 py-3 flex items-center gap-3">
+          {/* ロゴアバター */}
+          <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-sm flex-shrink-0">
+            <span className="text-[#06C755] text-base font-extrabold leading-none">PL</span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <h1 className="text-white font-bold text-base leading-tight truncate">
               Partner-Link サポート
             </h1>
-            <p className="text-xs text-zinc-500">
+            <p className="text-green-100 text-xs truncate">
               代理店さんの活動を加速する AI アシスタント
             </p>
           </div>
-          <span className="text-xs rounded-full bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 px-3 py-1">
+          {/* メニュータグ */}
+          <span className="flex-shrink-0 text-xs rounded-full bg-white/20 text-white px-3 py-1 font-medium">
             {menu.label}
           </span>
         </div>
       </header>
 
+      {/* ===== チャットエリア ===== */}
       <main className="flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-3xl px-4 py-6 space-y-4">
-          {/* Greeting bubble */}
-          <div className="flex justify-start">
-            <div className="max-w-[85%] rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-100 px-4 py-3 text-sm whitespace-pre-wrap">
-              {menu.greeting}
-            </div>
-          </div>
+        <div className="mx-auto max-w-2xl px-3 py-4 space-y-1">
 
-          {/* Quick replies — always available pre-first-message */}
+          {/* ウェルカムバブル（AIアバター付き） */}
+          <AssistantBubble
+            content={menu.greeting}
+            timestamp={new Date()}
+            references={[]}
+            showEscalation={false}
+            inquiryOpenFor={null}
+            msgId="welcome"
+            onOpenInquiry={() => {}}
+            inquiryProps={null}
+          />
+
+          {/* クイックリプライ（初回のみ） */}
           {messages.length === 0 && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div className="pl-11 flex flex-wrap gap-2 pt-1 pb-2">
               {menu.quickReplies.map((q) => (
                 <button
                   key={q}
                   onClick={() => void send(q)}
-                  className="text-left rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-indigo-400 dark:hover:border-indigo-500 px-3 py-2 text-sm text-zinc-700 dark:text-zinc-200 transition"
+                  className="text-sm rounded-full border-2 border-[#06C755] text-[#06C755] bg-white hover:bg-green-50 px-4 py-1.5 font-medium transition-colors shadow-sm"
                 >
                   {q}
                 </button>
@@ -223,126 +280,201 @@ export function ChatView() {
             </div>
           )}
 
-          {messages.map((m) => (
-            <div key={m.id}>
-              {m.role === "system" ? (
-                <div className="flex justify-center">
-                  <div className="rounded-full bg-emerald-50 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-200 px-4 py-1.5 text-xs">
+          {/* メッセージ一覧 */}
+          {messages.map((m) => {
+            if (m.role === "system") {
+              return (
+                <div key={m.id} className="flex justify-center py-2">
+                  <div className="rounded-full bg-white/80 text-gray-500 px-4 py-1.5 text-xs shadow-sm border border-gray-200">
+                    ✅ {m.content}
+                  </div>
+                </div>
+              );
+            }
+            if (m.role === "user") {
+              return (
+                <div key={m.id} className="flex justify-end items-end gap-2 mb-1">
+                  <span className="text-[10px] text-gray-400 mb-0.5 flex-shrink-0">
+                    {formatTime(m.timestamp)}
+                  </span>
+                  <div
+                    className="max-w-[75%] rounded-2xl rounded-br-sm px-4 py-2.5 text-sm whitespace-pre-wrap shadow-sm"
+                    style={{ background: "#06C755", color: "white" }}
+                  >
                     {m.content}
                   </div>
                 </div>
-              ) : (
-                <div
-                  className={
-                    m.role === "user" ? "flex justify-end" : "flex justify-start"
-                  }
-                >
-                  <div
-                    className={
-                      m.role === "user"
-                        ? "max-w-[85%] rounded-2xl bg-indigo-600 text-white px-4 py-2 text-sm whitespace-pre-wrap"
-                        : "max-w-[85%] rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-800 dark:text-zinc-100 px-4 py-3 text-sm"
-                    }
-                  >
-                    <div className="whitespace-pre-wrap">{m.content}</div>
+              );
+            }
+            // assistant
+            return (
+              <AssistantBubble
+                key={m.id}
+                content={m.content}
+                timestamp={m.timestamp}
+                references={m.references ?? []}
+                showEscalation={Boolean(m.showEscalation)}
+                inquiryOpenFor={inquiryOpenFor}
+                msgId={m.id}
+                onOpenInquiry={() => openInquiryFor(m)}
+                inquiryProps={
+                  inquiryOpenFor === m.id
+                    ? {
+                        agentId: inquiryAgentId,
+                        name: inquiryName,
+                        email: inquiryEmail,
+                        question: inquiryQuestion,
+                        submitting: inquirySubmitting,
+                        error: inquiryError,
+                        onAgentIdChange: setInquiryAgentId,
+                        onNameChange: setInquiryName,
+                        onEmailChange: setInquiryEmail,
+                        onQuestionChange: setInquiryQuestion,
+                        onCancel: () => setInquiryOpenFor(null),
+                        onSubmit: submitInquiry,
+                      }
+                    : null
+                }
+              />
+            );
+          })}
 
-                    {m.role === "assistant" &&
-                      m.references &&
-                      m.references.length > 0 && (
-                        <div className="mt-3 pt-3 border-t border-zinc-200 dark:border-zinc-800">
-                          <p className="text-[11px] font-semibold text-zinc-500 mb-1.5">
-                            参照元
-                          </p>
-                          <ul className="space-y-1">
-                            {m.references.map((ref, i) => (
-                              <li key={i} className="text-xs">
-                                {ref.url ? (
-                                  <a
-                                    href={ref.url}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="text-indigo-600 dark:text-indigo-400 hover:underline break-all"
-                                  >
-                                    {refIcon(ref.kind)} {ref.label}
-                                  </a>
-                                ) : (
-                                  <span className="text-zinc-600 dark:text-zinc-400">
-                                    {refIcon(ref.kind)} {ref.label}
-                                  </span>
-                                )}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
+          {/* タイピングインジケーター */}
+          {pending && <TypingIndicator />}
 
-                    {m.role === "assistant" && m.showEscalation && (
-                      <div className="mt-3 pt-3 border-t border-zinc-200 dark:border-zinc-800">
-                        {inquiryOpenFor === m.id ? (
-                          <InquiryForm
-                            agentId={inquiryAgentId}
-                            name={inquiryName}
-                            email={inquiryEmail}
-                            question={inquiryQuestion}
-                            submitting={inquirySubmitting}
-                            error={inquiryError}
-                            onAgentIdChange={setInquiryAgentId}
-                            onNameChange={setInquiryName}
-                            onEmailChange={setInquiryEmail}
-                            onQuestionChange={setInquiryQuestion}
-                            onCancel={() => setInquiryOpenFor(null)}
-                            onSubmit={submitInquiry}
-                          />
-                        ) : (
-                          <button
-                            onClick={() => openInquiryFor(m)}
-                            className="rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-medium px-3 py-1.5"
-                          >
-                            担当者に繋ぐ（GPに質問）
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
-
-          {pending && (
-            <div className="flex justify-start">
-              <div className="rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-4 py-2 text-sm text-zinc-500">
-                回答を生成中...
-              </div>
-            </div>
-          )}
           <div ref={bottomRef} />
         </div>
       </main>
 
-      <footer className="border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950">
-        <div className="mx-auto max-w-3xl px-4 py-3 flex gap-2 items-end">
+      {/* ===== 入力フッター ===== */}
+      <footer className="flex-shrink-0 bg-white border-t border-gray-200 shadow-[0_-2px_8px_rgba(0,0,0,0.06)]">
+        <div className="mx-auto max-w-2xl px-3 py-2.5 flex gap-2 items-end">
           <textarea
+            ref={textareaRef}
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={(e) => {
+              setInput(e.target.value);
+              adjustTextarea();
+            }}
             onKeyDown={onKeyDown}
             rows={1}
-            placeholder="ご質問を入力してください..."
-            className="flex-1 resize-none rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            placeholder="メッセージを入力..."
+            className="flex-1 resize-none rounded-2xl border border-gray-300 bg-gray-50 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:border-transparent transition"
+            style={{ minHeight: "42px", maxHeight: "120px" }}
           />
           <button
             onClick={() => void send(input)}
             disabled={pending || !input.trim()}
-            className="rounded-xl bg-indigo-600 text-white px-4 py-2 text-sm font-medium disabled:opacity-40"
+            className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 transition-all disabled:opacity-40 shadow-sm"
+            style={{ background: input.trim() ? "#06C755" : "#ccc" }}
+            aria-label="送信"
           >
-            送信
+            {/* 送信アイコン（紙飛行機） */}
+            <svg viewBox="0 0 24 24" fill="white" className="w-5 h-5 translate-x-0.5">
+              <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+            </svg>
           </button>
         </div>
+        <p className="text-center text-[10px] text-gray-400 pb-2">
+          Shift+Enter で改行 / Enter で送信
+        </p>
       </footer>
     </div>
   );
 }
 
+// ===== AIアシスタントバブルコンポーネント =====
+type AssistantBubbleProps = {
+  content: string;
+  timestamp: Date;
+  references: KnowledgeReference[];
+  showEscalation: boolean;
+  inquiryOpenFor: string | null;
+  msgId: string;
+  onOpenInquiry: () => void;
+  inquiryProps: InquiryFormProps | null;
+};
+
+function AssistantBubble({
+  content,
+  timestamp,
+  references,
+  showEscalation,
+  inquiryOpenFor,
+  msgId,
+  onOpenInquiry,
+  inquiryProps,
+}: AssistantBubbleProps) {
+  return (
+    <div className="flex items-end gap-2 mb-3">
+      {/* アバター */}
+      <div
+        className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 shadow-sm self-end"
+        style={{ background: "#06C755" }}
+      >
+        <span className="text-white text-xs font-bold">AI</span>
+      </div>
+
+      <div className="flex flex-col gap-1 max-w-[80%]">
+        {/* メインバブル */}
+        <div className="bg-white rounded-2xl rounded-bl-sm px-4 py-3 shadow-sm border border-gray-100 text-sm text-gray-800 whitespace-pre-wrap">
+          {content}
+
+          {/* 参照元 */}
+          {references.length > 0 && (
+            <div className="mt-3 pt-3 border-t border-gray-100">
+              <p className="text-[11px] font-semibold text-gray-400 mb-1.5">参照元</p>
+              <ul className="space-y-1">
+                {references.map((ref, i) => (
+                  <li key={i} className="text-xs">
+                    {ref.url ? (
+                      <a
+                        href={ref.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[#06C755] hover:underline break-all"
+                      >
+                        {refIcon(ref.kind)} {ref.label}
+                      </a>
+                    ) : (
+                      <span className="text-gray-500">
+                        {refIcon(ref.kind)} {ref.label}
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* エスカレーションボタン or フォーム */}
+          {showEscalation && (
+            <div className="mt-3 pt-3 border-t border-gray-100">
+              {inquiryOpenFor === msgId && inquiryProps ? (
+                <InquiryForm {...inquiryProps} />
+              ) : (
+                <button
+                  onClick={onOpenInquiry}
+                  className="w-full rounded-xl text-white text-xs font-semibold px-4 py-2.5 transition-colors shadow-sm"
+                  style={{ background: "#06C755" }}
+                >
+                  👤 担当者に繋ぐ（GPに直接質問）
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* タイムスタンプ */}
+        <span className="text-[10px] text-gray-400 pl-1">
+          {formatTime(timestamp)}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// ===== 問い合わせフォームコンポーネント =====
 type InquiryFormProps = {
   agentId: string;
   name: string;
@@ -360,17 +492,17 @@ type InquiryFormProps = {
 
 function InquiryForm(props: InquiryFormProps) {
   return (
-    <div className="space-y-2">
-      <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-200">
-        一次代理店（GP）への問い合わせフォーム
+    <div className="space-y-3">
+      <p className="text-xs font-semibold text-gray-700">
+        一次代理店（GP）への問い合わせ
       </p>
 
-      <label className="block text-[11px] text-zinc-500">
-        一次代理店
+      <div>
+        <label className="block text-[11px] text-gray-500 mb-1">一次代理店</label>
         <select
           value={props.agentId}
           onChange={(e) => props.onAgentIdChange(e.target.value)}
-          className="mt-1 block w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-2 py-1.5 text-xs"
+          className="block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-green-400"
         >
           {AGENTS.map((a) => (
             <option key={a.id} value={a.id}>
@@ -378,57 +510,60 @@ function InquiryForm(props: InquiryFormProps) {
             </option>
           ))}
         </select>
-      </label>
+      </div>
 
-      <label className="block text-[11px] text-zinc-500">
-        お名前（必須）
+      <div>
+        <label className="block text-[11px] text-gray-500 mb-1">お名前 *</label>
         <input
           type="text"
           maxLength={200}
           value={props.name}
           onChange={(e) => props.onNameChange(e.target.value)}
-          className="mt-1 block w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-2 py-1.5 text-xs"
+          placeholder="山田 太郎"
+          className="block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-green-400"
         />
-      </label>
+      </div>
 
-      <label className="block text-[11px] text-zinc-500">
-        メールアドレス（必須）
+      <div>
+        <label className="block text-[11px] text-gray-500 mb-1">メールアドレス *</label>
         <input
           type="email"
           maxLength={320}
           value={props.email}
           onChange={(e) => props.onEmailChange(e.target.value)}
-          className="mt-1 block w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-2 py-1.5 text-xs"
+          placeholder="example@email.com"
+          className="block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-green-400"
         />
-      </label>
+      </div>
 
-      <label className="block text-[11px] text-zinc-500">
-        ご質問内容（必須・最大5000文字）
+      <div>
+        <label className="block text-[11px] text-gray-500 mb-1">ご質問内容 *</label>
         <textarea
-          rows={4}
+          rows={3}
           maxLength={5000}
           value={props.question}
           onChange={(e) => props.onQuestionChange(e.target.value)}
-          className="mt-1 block w-full resize-none rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-2 py-1.5 text-xs"
+          className="block w-full resize-none rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-green-400"
         />
-      </label>
+      </div>
 
       {props.error && (
-        <p className="text-[11px] text-rose-600">{props.error}</p>
+        <p className="text-[11px] text-red-500">{props.error}</p>
       )}
 
       <div className="flex gap-2">
         <button
           onClick={props.onSubmit}
           disabled={props.submitting}
-          className="rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium px-3 py-1.5 disabled:opacity-40"
+          className="flex-1 rounded-xl text-white text-xs font-semibold py-2.5 disabled:opacity-40 transition-colors"
+          style={{ background: "#06C755" }}
         >
           {props.submitting ? "送信中..." : "送信する"}
         </button>
         <button
           onClick={props.onCancel}
           disabled={props.submitting}
-          className="rounded-lg border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200 text-xs px-3 py-1.5"
+          className="rounded-xl border border-gray-300 text-gray-600 text-xs px-4 py-2.5"
         >
           キャンセル
         </button>
