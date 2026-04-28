@@ -237,11 +237,11 @@ export function ChatView() {
         <div className="mx-auto max-w-2xl px-4 py-3 flex items-center gap-3">
           {/* ロゴアバター */}
           <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-sm flex-shrink-0">
-            <span className="text-[#06C755] text-base font-extrabold leading-none">PL</span>
+            <span className="text-[#06C755] text-sm font-extrabold leading-none">AIX</span>
           </div>
           <div className="flex-1 min-w-0">
             <h1 className="text-white font-bold text-base leading-tight truncate">
-              Partner-Link サポート
+              AIX サポート
             </h1>
             <p className="text-green-100 text-xs truncate">
               代理店さんの活動を加速する AI アシスタント
