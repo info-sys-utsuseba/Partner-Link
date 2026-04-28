@@ -72,12 +72,19 @@ export default function Home() {
 
   return (
     <div className="flex flex-col h-screen bg-zinc-50 dark:bg-black">
-      <header className="border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950">
+      <header className="bg-[#4caf50]">
         <div className="mx-auto max-w-3xl px-4 py-3">
-          <h1 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">
-            Partner-Link サポート
-          </h1>
-          <p className="text-xs text-zinc-500">代理店さんの活動を加速するAIアシスタント</p>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
+              <span className="text-white font-bold text-sm tracking-tight">AIX</span>
+            </div>
+            <div>
+              <h1 className="text-base font-bold text-white leading-tight">
+                AIX サポート
+              </h1>
+              <p className="text-xs text-white/80">代理店さんの活動を加速する AI アシスタント</p>
+            </div>
+          </div>
         </div>
       </header>
 
