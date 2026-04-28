@@ -219,6 +219,9 @@ export function ChatView() {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       void send(input);
+    } else if (e.key === "Enter" && e.shiftKey) {
+      // Shift+Enter: 改行後にtextarea高さを更新
+      setTimeout(() => adjustTextarea(), 0);
     }
   }
 
