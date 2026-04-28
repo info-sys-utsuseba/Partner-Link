@@ -118,6 +118,8 @@ export function ChatView() {
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
     }
+    // 送信後にフォーカスを戻す
+    setTimeout(() => textareaRef.current?.focus(), 50);
     const userMsg: ChatMessage = {
       id: uuid(),
       role: "user",
@@ -362,18 +364,22 @@ export function ChatView() {
             onKeyDown={onKeyDown}
             rows={1}
             placeholder="メッセージを入力..."
-            className="flex-1 resize-none rounded-2xl border border-gray-300 bg-gray-50 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:border-transparent transition"
+            className="flex-1 resize-none rounded-2xl border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#06C755] focus:border-transparent transition"
             style={{ minHeight: "42px", maxHeight: "120px" }}
           />
           <button
             onClick={() => void send(input)}
             disabled={pending || !input.trim()}
             className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 transition-all disabled:opacity-40 shadow-sm"
-            style={{ background: input.trim() ? "#06C755" : "#ccc" }}
+            style={{ background: input.trim() ? "#06C755" : "#e5e7eb" }}
             aria-label="送信"
           >
             {/* 送信アイコン（紙飛行機） */}
-            <svg viewBox="0 0 24 24" fill="white" className="w-5 h-5 translate-x-0.5">
+            <svg
+              viewBox="0 0 24 24"
+              className="w-5 h-5 translate-x-0.5"
+              fill={input.trim() ? "white" : "#374151"}
+            >
               <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
             </svg>
           </button>
